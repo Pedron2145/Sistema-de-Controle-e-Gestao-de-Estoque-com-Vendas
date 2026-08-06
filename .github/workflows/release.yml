@@ -2,7 +2,7 @@ name: 'publish'
 on:
   push:
     branches:
-      - master # Dispara a pipeline sempre que você der push na branch main
+      - main # Dispara a pipeline sempre que você der push na branch main
 
 jobs:
   publish-tauri:
@@ -37,6 +37,6 @@ jobs:
         with:
           tagName: app-v__VERSION__ # Cria uma tag automática baseada no seu tauri.conf.json
           releaseName: 'App v__VERSION__'
-          releaseBody: 'Versão gerada automaticamente.'
+          releaseBody: 'Versão gerada automaticamente pelo GitHub Actions.'
           releaseDraft: true
           prerelease: false
