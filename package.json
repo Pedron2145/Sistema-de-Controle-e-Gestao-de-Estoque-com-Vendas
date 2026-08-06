@@ -6,12 +6,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "tauri": "tauri"
   }
+  
+
 }
-
-

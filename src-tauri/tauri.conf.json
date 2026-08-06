@@ -7,7 +7,7 @@
     "frontendDist": "../inventario/dist",
     "devUrl": "http://127.0.0.1:4173/",
     "beforeDevCommand": "npm --prefix ./inventario run dev -- --host 127.0.0.1 --port 4173",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm --prefix ./inventario run build"
 
   },
   "app": {
