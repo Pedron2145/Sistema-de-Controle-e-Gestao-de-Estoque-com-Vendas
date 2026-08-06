@@ -1,0 +1,42 @@
+name: 'publish'
+on:
+  push:
+    branches:
+      - main # Dispara a pipeline sempre que você der push na branch main
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write # Permite criar a release e fazer upload do .exe
+    strategy:
+      fail-fast: false
+      matrix:
+        # Você pode adicionar 'macos-latest' ou 'ubuntu-22.04' aqui se quiser gerar para outras plataformas
+        platform: [windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/* # Instala o Node.js mais recente
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install frontend dependencies
+        # Altere para 'yarn install' ou 'pnpm install' dependendo do seu projeto
+        run: npm install 
+
+      - name: build and release Tauri app
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: app-v__VERSION__ # Cria uma tag automática baseada no seu tauri.conf.json
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'Versão gerada automaticamente pelo GitHub Actions.'
+          releaseDraft: true
+          prerelease: false
