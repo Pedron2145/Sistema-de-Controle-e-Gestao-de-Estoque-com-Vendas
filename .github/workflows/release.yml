@@ -34,11 +34,11 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Esta variável de ambiente abaixo força o Tauri v1/v2 a usar o comando correto independente do arquivo JSON
+          TAURI_BEFORE_BUILD_COMMAND: "npm run build"
         with:
           tagName: app-v__VERSION__
           releaseName: 'App v__VERSION__'
           releaseBody: 'Versão gerada automaticamente pelo GitHub Actions.'
           releaseDraft: true
           prerelease: false
-          # Esta linha abaixo força o Tauri a ignorar scripts quebrados do conf.json
-          args: --before-build "npm run build" 
