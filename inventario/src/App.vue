@@ -35,7 +35,7 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style>
 :global(body) {
   margin: 0;
   font-family: Inter, 'Segoe UI', sans-serif;
