@@ -6,7 +6,12 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1"
+  },
+  "scripts": {
+    "tauri": "tauri",
+    "build": "echo 'Sem frontend para buildar'"
   }
-  
-
 }
+
+
+
