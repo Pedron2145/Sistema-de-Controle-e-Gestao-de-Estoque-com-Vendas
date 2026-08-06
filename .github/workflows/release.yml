@@ -2,7 +2,7 @@ name: 'publish'
 on:
   push:
     branches:
-      - main # Dispara a pipeline sempre que você der push na branch main
+      - master # Dispara a pipeline sempre que você der push na branch main
 
 jobs:
   publish-tauri:
