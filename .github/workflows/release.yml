@@ -38,6 +38,8 @@ jobs:
           # Garante que o frontend Vue seja construído antes do empacotamento do Tauri
           TAURI_BEFORE_BUILD_COMMAND: "npm --prefix ./inventario run build"
         with:
+          projectPath: ./src-tauri
+          args: --bundles nsis,msi
           tagName: app-v__VERSION__
           releaseName: 'App v__VERSION__'
           releaseBody: 'Versão gerada automaticamente pelo GitHub Actions.'
