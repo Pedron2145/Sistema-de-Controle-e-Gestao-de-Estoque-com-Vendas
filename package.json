@@ -9,7 +9,7 @@
   },
   "scripts": {
     "tauri": "tauri",
-    "build": "echo 'Sem frontend para buildar'"
+    "build": "npm --prefix ./inventario run build"
   }
 }
 
