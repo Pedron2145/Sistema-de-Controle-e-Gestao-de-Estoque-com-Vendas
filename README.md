@@ -63,7 +63,7 @@ npm run tauri dev
 
 ## 📌 Objetivo do projeto
 
-Este projeto representa uma solução prática e visualmente limpa para gestão de estoque, com foco em aprendizado, organização de código e apresentação profissional em portfólio.
+Este projeto tem por finalidade o aprendizado sobre o desenvolvimento de soluções com o auxílio de IAs e testar novas tecnologias.
 
 ## 🔮 Próximos passos
 
