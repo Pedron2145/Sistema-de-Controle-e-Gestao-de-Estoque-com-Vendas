@@ -1,5 +1,7 @@
 import { ref, computed } from 'vue'
 
+// Persistência local simples: o estado do inventário é recuperado do localStorage
+// para manter os dados disponíveis mesmo após atualização da página ou reinicialização do app.
 function loadState(key, fallback) {
   if (typeof window === 'undefined') return fallback
   try {
@@ -28,6 +30,8 @@ function setFeedback(type, message) {
   feedback.value = { type, message }
 }
 
+// Exportação em JSON para backup da base de dados do sistema.
+// Essa função gera um arquivo com o estado atual de produtos e vendas.
 function downloadDatabase() {
   if (typeof window === 'undefined') return
   const payload = { exportedAt: new Date().toISOString(), products: products.value, sales: sales.value }
@@ -47,6 +51,8 @@ function triggerImport() {
   fileInput.value?.click()
 }
 
+// Importação de dados em formato JSON.
+// O fluxo valida a estrutura do arquivo e substitui o estado atual por dados importados.
 function handleImport(event) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -84,6 +90,8 @@ function resetSaleForm() {
   saleForm.value = { productId: products.value[0]?.id || '', clientName: '', customerType: 'Pessoa física', quantity: 1 }
 }
 
+// Cadastro e edição de produtos.
+// Aqui são aplicadas as validações básicas para evitar registros inconsistentes.
 function handleProductSubmit() {
   if (!productForm.value.name.trim() || !productForm.value.manufacturer.trim() || !productForm.value.brand.trim()) {
     setFeedback('error', 'Preencha nome, fabricante e marca para salvar o produto.')
@@ -124,6 +132,9 @@ function removeProduct(productId) {
   setFeedback('success', 'Produto removido.')
 }
 
+// Fluxo central de vendas.
+// A regra de negócio mais crítica do sistema é garantir que a venda só seja registrada
+// quando o produto existe, o cliente foi informado e há estoque suficiente.
 function handleSaleSubmit() {
   const product = products.value.find((item) => item.id === saleForm.value.productId)
   if (!product) {
