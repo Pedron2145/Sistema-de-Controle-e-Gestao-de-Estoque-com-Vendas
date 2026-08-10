@@ -11,6 +11,8 @@ import { useInventory } from './composables/useInventory'
 
 const { resetSaleForm } = useInventory()
 
+// O componente principal apenas monta a estrutura da interface e inicializa
+// o formulário de venda para evitar estados inconsistentes na abertura do app.
 onMounted(() => {
   resetSaleForm()
 })
