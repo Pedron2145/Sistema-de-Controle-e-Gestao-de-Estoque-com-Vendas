@@ -1,6 +1,6 @@
 # Inventário
 
-Aplicação de controle de estoque e vendas desenvolvida com Vue 3, Vite e Tauri, com foco em simplicidade, usabilidade e persistência local de dados.
+Aplicação de controle de estoque e vendas desenvolvida com Vue 3, Vite e Tauri, com foco em simplicidade, usabilidade e persistência centralizada em MySQL.
 
 Este projeto foi criado com a finalidade de ser um aprendizado para o uso das IAs em projetos
 
@@ -10,8 +10,8 @@ Este projeto foi criado com a finalidade de ser um aprendizado para o uso das IA
 - Edição e remoção de produtos
 - Registro de vendas com baixa automática no estoque
 - Validação de regras de negócio, como estoque insuficiente e campos obrigatórios
-- Persistência em armazenamento local do navegador
-- Exportação e importação de dados em formato JSON para backup e migração
+- Persistência centralizada em MySQL executado com Docker
+- Sessões, usuários e permissões armazenados no MySQL
 - Interface visual organizada com painel de estatísticas e feedback ao usuário
 
 ## 🛠️ Tecnologias usadas
@@ -20,7 +20,9 @@ Este projeto foi criado com a finalidade de ser um aprendizado para o uso das IA
 - Vite
 - Tauri para empacotamento como aplicação desktop
 - JavaScript moderno
-- LocalStorage para persistência
+- MySQL 8.4 via Docker Compose
+- SQLx no backend Rust para acesso ao banco
+- Argon2 para hash de senhas
 
 ## 🧠 Destaques do projeto
 
@@ -30,7 +32,7 @@ Este projeto reforça conceitos importantes de desenvolvimento frontend e arquit
 - Separação entre lógica de negócio e componentes de interface
 - Regras de validação para evitar inconsistências
 - Experiência de uso com feedback visual e fluxo simples
-- Base preparada para evoluir para funcionalidades mais robustas, como autenticação, relatórios e integração com banco de dados
+- Backend Tauri como única camada de acesso ao banco, sem conexão direta do Vue com o MySQL
 
 ## 📁 Estrutura principal
 
@@ -69,7 +71,6 @@ Este projeto representa uma solução prática e visualmente limpa para gestão 
 
 - Implementar autenticação de usuário
 - Adicionar relatórios e gráficos de vendas
-- Integrar com banco de dados real
 - Criar filtros e busca avançada por produtos
 - Melhorar a experiência mobile e desktop
 

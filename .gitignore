@@ -1,3 +1,40 @@
+# Dependências
+node_modules/
+**/node_modules/
+
+# Builds e artefatos gerados
+dist/
+**/dist/
+dist-ssr/
+**/dist-ssr/
+target/
+**/target/
+*.AppImage
+
+# Ferramentas locais e binários auxiliares
 tools/
 
-ERP_Basic-x86_64.AppImage
+# Logs, caches e cobertura de testes
+*.log
+logs/
+coverage/
+.eslintcache
+.vite/
+*.local
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Sistema operacional e editores
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# Configurações e segredos locais
+.env
+.env.*
+!/.env.example

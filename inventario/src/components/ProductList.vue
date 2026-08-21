@@ -1,6 +1,10 @@
 <script setup>
 import { useInventory } from '../composables/useInventory'
+import { useAuth } from '../composables/useAuth'
 const { products, editProduct, removeProduct } = useInventory()
+const { hasPermission } = useAuth()
+const canEdit = hasPermission('estoque', 'can_edit')
+const canDelete = hasPermission('estoque', 'can_delete')
 </script>
 
 <template>
@@ -18,8 +22,8 @@ const { products, editProduct, removeProduct } = useInventory()
           <p class="stock">Estoque: {{ product.quantity }}</p>
         </div>
         <div class="card-actions">
-          <button class="ghost-btn" @click="editProduct(product)">Editar</button>
-          <button class="danger-btn" @click="removeProduct(product.id)">Remover</button>
+          <button v-if="canEdit" class="ghost-btn" @click="editProduct(product)">Editar</button>
+          <button v-if="canDelete" class="danger-btn" @click="removeProduct(product.id)">Remover</button>
         </div>
       </article>
     </div>

@@ -1,6 +1,10 @@
 <script setup>
 import { useInventory } from '../composables/useInventory'
+import { useAuth } from '../composables/useAuth'
 const { productForm, editingProductId, handleProductSubmit, resetProductForm } = useInventory()
+const { hasPermission } = useAuth()
+const canCreate = hasPermission('estoque', 'can_create')
+const canEdit = hasPermission('estoque', 'can_edit')
 </script>
 
 <template>
@@ -27,7 +31,7 @@ const { productForm, editingProductId, handleProductSubmit, resetProductForm } =
         Quantidade
         <input v-model.number="productForm.quantity" type="number" min="1" />
       </label>
-      <button type="submit" class="primary-btn">{{ editingProductId ? 'Salvar alterações' : 'Cadastrar produto' }}</button>
+      <button v-if="editingProductId ? canEdit : canCreate" type="submit" class="primary-btn">{{ editingProductId ? 'Salvar alterações' : 'Cadastrar produto' }}</button>
     </form>
   </div>
 </template>

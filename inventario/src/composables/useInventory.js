@@ -1,84 +1,26 @@
 import { ref, computed } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { useAuth } from './useAuth'
 
-// Persistência local simples: o estado do inventário é recuperado do localStorage
-// para manter os dados disponíveis mesmo após atualização da página ou reinicialização do app.
-function loadState(key, fallback) {
-  if (typeof window === 'undefined') return fallback
-  try {
-    const saved = window.localStorage.getItem(key)
-    return saved ? JSON.parse(saved) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function persistState(products, sales) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem('erp-products', JSON.stringify(products.value))
-  window.localStorage.setItem('erp-sales', JSON.stringify(sales.value))
-}
-
-const products = ref(loadState('erp-products', []))
-const sales = ref(loadState('erp-sales', []))
+const products = ref([])
+const sales = ref([])
 const productForm = ref({ name: '', manufacturer: '', brand: '', quantity: 1 })
 const saleForm = ref({ productId: '', clientName: '', customerType: 'Pessoa física', quantity: 1 })
 const editingProductId = ref(null)
 const feedback = ref({ type: '', message: '' })
-const fileInput = ref(null)
+const loading = ref(false)
+
+const { session, hasPermission } = useAuth()
 
 function setFeedback(type, message) {
   feedback.value = { type, message }
 }
 
-// Exportação em JSON para backup da base de dados do sistema.
-// Essa função gera um arquivo com o estado atual de produtos e vendas.
-function downloadDatabase() {
-  if (typeof window === 'undefined') return
-  const payload = { exportedAt: new Date().toISOString(), products: products.value, sales: sales.value }
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-  const url = window.URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `inventory-db-${new Date().toISOString().slice(0, 10)}.json`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  window.URL.revokeObjectURL(url)
-  setFeedback('success', 'Banco exportado com sucesso.')
-}
-
-function triggerImport() {
-  fileInput.value?.click()
-}
-
-// Importação de dados em formato JSON.
-// O fluxo valida a estrutura do arquivo e substitui o estado atual por dados importados.
-function handleImport(event) {
-  const file = event.target.files?.[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    try {
-      if (typeof reader.result !== 'string') throw new Error('Arquivo inválido')
-      const parsed = JSON.parse(reader.result)
-      const importedProducts = Array.isArray(parsed.products) ? parsed.products : []
-      const importedSales = Array.isArray(parsed.sales) ? parsed.sales : []
-      products.value = importedProducts
-      sales.value = importedSales
-      persistState(products, sales)
-      resetSaleForm()
-      setFeedback('success', 'Dados importados com sucesso. Estoque e vendas foram atualizados.')
-    } catch {
-      setFeedback('error', 'Não foi possível importar o arquivo JSON.')
-    } finally {
-      event.target.value = ''
-    }
+function sessionToken() {
+  if (!session.value?.token) {
+    throw new Error('Sessão não encontrada. Faça login novamente.')
   }
-  reader.onerror = () => {
-    setFeedback('error', 'Não foi possível ler o arquivo selecionado.')
-    event.target.value = ''
-  }
-  reader.readAsText(file)
+  return session.value.token
 }
 
 function resetProductForm() {
@@ -87,61 +29,103 @@ function resetProductForm() {
 }
 
 function resetSaleForm() {
-  saleForm.value = { productId: products.value[0]?.id || '', clientName: '', customerType: 'Pessoa física', quantity: 1 }
+  saleForm.value = {
+    productId: products.value[0]?.id || '',
+    clientName: '',
+    customerType: 'Pessoa física',
+    quantity: 1,
+  }
 }
 
-// Cadastro e edição de produtos.
-// Aqui são aplicadas as validações básicas para evitar registros inconsistentes.
-function handleProductSubmit() {
-  if (!productForm.value.name.trim() || !productForm.value.manufacturer.trim() || !productForm.value.brand.trim()) {
+async function loadData() {
+  if (!session.value?.token) return
+  loading.value = true
+  try {
+    const loadedProducts = await invoke('list_products', { session_token: sessionToken() })
+    const loadedSales = hasPermission('relatorios', 'can_view')
+      ? await invoke('list_sales', { session_token: sessionToken() })
+      : []
+    products.value = loadedProducts
+    sales.value = loadedSales
+    resetSaleForm()
+  } catch (error) {
+    setFeedback('error', error?.toString() ?? 'Não foi possível carregar os dados do MySQL.')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleProductSubmit() {
+  const name = productForm.value.name.trim()
+  const manufacturer = productForm.value.manufacturer.trim()
+  const brand = productForm.value.brand.trim()
+  const quantity = Number(productForm.value.quantity)
+
+  if (!name || !manufacturer || !brand) {
     setFeedback('error', 'Preencha nome, fabricante e marca para salvar o produto.')
     return
   }
-  const quantity = Number(productForm.value.quantity)
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    setFeedback('error', 'A quantidade deve ser um número inteiro maior que zero.')
+  if (!Number.isInteger(quantity) || quantity < 0) {
+    setFeedback('error', 'A quantidade deve ser um número inteiro maior ou igual a zero.')
     return
   }
-  if (editingProductId.value) {
-    products.value = products.value.map((product) =>
-      product.id === editingProductId.value ? { ...product, ...productForm.value, quantity } : product,
-    )
-    setFeedback('success', 'Produto atualizado com sucesso.')
-  } else {
-    products.value = [
-      ...products.value,
-      { id: Date.now(), name: productForm.value.name.trim(), manufacturer: productForm.value.manufacturer.trim(), brand: productForm.value.brand.trim(), quantity },
-    ]
-    setFeedback('success', 'Produto cadastrado com sucesso.')
+
+  loading.value = true
+  try {
+    const payload = { name, manufacturer, brand, quantity, session_token: sessionToken() }
+    const savedProduct = editingProductId.value
+      ? await invoke('update_product', { payload: { ...payload, id: editingProductId.value } })
+      : await invoke('create_product', { payload })
+
+    if (editingProductId.value) {
+      products.value = products.value.map((product) => (product.id === savedProduct.id ? savedProduct : product))
+      setFeedback('success', 'Produto atualizado com sucesso.')
+    } else {
+      products.value = [...products.value, savedProduct].sort((first, second) => first.name.localeCompare(second.name))
+      setFeedback('success', 'Produto cadastrado com sucesso.')
+    }
+    resetProductForm()
+    resetSaleForm()
+  } catch (error) {
+    setFeedback('error', error?.toString() ?? 'Não foi possível salvar o produto.')
+  } finally {
+    loading.value = false
   }
-  persistState(products, sales)
-  resetProductForm()
-  resetSaleForm()
 }
 
 function editProduct(product) {
-  productForm.value = { name: product.name, manufacturer: product.manufacturer, brand: product.brand, quantity: product.quantity }
+  productForm.value = {
+    name: product.name,
+    manufacturer: product.manufacturer,
+    brand: product.brand,
+    quantity: product.quantity,
+  }
   editingProductId.value = product.id
   setFeedback('info', 'Você está editando um produto existente.')
 }
 
-function removeProduct(productId) {
-  products.value = products.value.filter((product) => product.id !== productId)
-  if (saleForm.value.productId === productId) resetSaleForm()
-  persistState(products, sales)
-  setFeedback('success', 'Produto removido.')
+async function removeProduct(productId) {
+  loading.value = true
+  try {
+    await invoke('delete_product', {
+      payload: { id: productId, session_token: sessionToken() },
+    })
+    products.value = products.value.filter((product) => product.id !== productId)
+    resetSaleForm()
+    setFeedback('success', 'Produto removido.')
+  } catch (error) {
+    setFeedback('error', error?.toString() ?? 'Não foi possível remover o produto.')
+  } finally {
+    loading.value = false
+  }
 }
 
-// Fluxo central de vendas.
-// A regra de negócio mais crítica do sistema é garantir que a venda só seja registrada
-// quando o produto existe, o cliente foi informado e há estoque suficiente.
-function handleSaleSubmit() {
-  const product = products.value.find((item) => item.id === saleForm.value.productId)
-  if (!product) {
+async function handleSaleSubmit() {
+  const quantity = Number(saleForm.value.quantity)
+  if (!saleForm.value.productId) {
     setFeedback('error', 'Selecione um produto válido para vender.')
     return
   }
-  const quantity = Number(saleForm.value.quantity)
   if (!saleForm.value.clientName.trim()) {
     setFeedback('error', 'Informe o nome do cliente ou empresa.')
     return
@@ -150,18 +134,27 @@ function handleSaleSubmit() {
     setFeedback('error', 'A quantidade da venda deve ser um número inteiro maior que zero.')
     return
   }
-  if (quantity > product.quantity) {
-    setFeedback('error', 'Estoque insuficiente para esta venda.')
-    return
+
+  loading.value = true
+  try {
+    const sale = await invoke('create_sale', {
+      payload: {
+        product_id: saleForm.value.productId,
+        client_name: saleForm.value.clientName.trim(),
+        customer_type: saleForm.value.customerType,
+        quantity,
+        session_token: sessionToken(),
+      },
+    })
+    await loadData()
+    sales.value = [sale, ...sales.value.filter((item) => item.id !== sale.id)]
+    setFeedback('success', 'Venda registrada e estoque atualizado.')
+    resetSaleForm()
+  } catch (error) {
+    setFeedback('error', error?.toString() ?? 'Não foi possível registrar a venda.')
+  } finally {
+    loading.value = false
   }
-  products.value = products.value.map((item) => (item.id === product.id ? { ...item, quantity: item.quantity - quantity } : item))
-  sales.value = [
-    { id: Date.now(), productName: product.name, clientName: saleForm.value.clientName.trim(), customerType: saleForm.value.customerType, quantity, date: new Date().toLocaleString('pt-BR') },
-    ...sales.value,
-  ]
-  persistState(products, sales)
-  setFeedback('success', 'Venda registrada e estoque atualizado.')
-  resetSaleForm()
 }
 
 const totalProducts = computed(() => products.value.length)
@@ -176,11 +169,9 @@ export function useInventory() {
     saleForm,
     editingProductId,
     feedback,
-    fileInput,
+    loading,
     setFeedback,
-    downloadDatabase,
-    triggerImport,
-    handleImport,
+    loadData,
     resetProductForm,
     resetSaleForm,
     handleProductSubmit,
