@@ -69,9 +69,16 @@ pub struct AppStatus {
 #[derive(Debug, Clone, Serialize)]
 pub struct Product {
   id: i64,
+  code: String,
   name: String,
   manufacturer: String,
   brand: String,
+  supplier: String,
+  status: String,
+  street: i64,
+  position: i64,
+  level: i64,
+  apartment: i64,
   quantity: i64,
 }
 
@@ -88,9 +95,16 @@ pub struct Sale {
 
 #[derive(Debug, Deserialize)]
 pub struct ProductPayload {
+  code: String,
   name: String,
   manufacturer: String,
   brand: String,
+  supplier: String,
+  status: String,
+  street: i64,
+  position: i64,
+  level: i64,
+  apartment: i64,
   quantity: i64,
   session_token: String,
 }
@@ -98,9 +112,16 @@ pub struct ProductPayload {
 #[derive(Debug, Deserialize)]
 pub struct UpdateProductPayload {
   id: i64,
+  code: String,
   name: String,
   manufacturer: String,
   brand: String,
+  supplier: String,
+  status: String,
+  street: i64,
+  position: i64,
+  level: i64,
+  apartment: i64,
   quantity: i64,
   session_token: String,
 }
@@ -117,6 +138,30 @@ pub struct SalePayload {
   client_name: String,
   customer_type: String,
   quantity: i64,
+  session_token: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PickingDemand {
+  id: i64,
+  sale_id: i64,
+  status: String,
+  created_at: String,
+  client_name: String,
+  items: Vec<PickingDemandItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PickingDemandItem {
+  code: String,
+  name: String,
+  quantity: i64,
+  position: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DemandStatusPayload {
+  demand_id: i64,
   session_token: String,
 }
 
@@ -171,7 +216,7 @@ fn user_from_row(row: &sqlx::mysql::MySqlRow) -> UserSummary {
 }
 
 fn default_permissions_for_role(role: &str) -> Vec<UserPermission> {
-  let modules = ["vendas", "estoque", "relatorios", "clientes"];
+  let modules = ["vendas", "estoque", "demandas", "relatorios", "clientes"];
 
   if role == "admin" {
     return modules
@@ -188,29 +233,50 @@ fn default_permissions_for_role(role: &str) -> Vec<UserPermission> {
 
   modules
     .iter()
-    .map(|module| match *module {
-      "vendas" => UserPermission {
+    .map(|module| match (role, *module) {
+      ("vendedor", "vendas") => UserPermission {
+        module: module.to_string(), can_view: true, can_create: true, can_edit: false, can_delete: false,
+      },
+      ("vendedor", "estoque") => UserPermission {
+        module: module.to_string(), can_view: true, can_create: false, can_edit: false, can_delete: false,
+      },
+      ("estoquista", "estoque") => UserPermission {
+        module: module.to_string(), can_view: true, can_create: false, can_edit: false, can_delete: false,
+      },
+      ("estoquista", "demandas") => UserPermission {
+        module: module.to_string(), can_view: true, can_create: false, can_edit: true, can_delete: false,
+      },
+      ("pce", "estoque") => UserPermission {
+        module: module.to_string(), can_view: true, can_create: true, can_edit: true, can_delete: false,
+      },
+      ("pce", "relatorios") => UserPermission {
+        module: module.to_string(), can_view: true, can_create: true, can_edit: false, can_delete: false,
+      },
+      ("vendedor", "relatorios") | ("estoquista", "relatorios") => UserPermission {
+        module: module.to_string(), can_view: false, can_create: false, can_edit: false, can_delete: false,
+      },
+      (_, "vendas") => UserPermission {
         module: module.to_string(),
         can_view: true,
         can_create: true,
         can_edit: false,
         can_delete: false,
       },
-      "estoque" => UserPermission {
+      (_, "estoque") => UserPermission {
         module: module.to_string(),
         can_view: true,
         can_create: false,
         can_edit: false,
         can_delete: false,
       },
-      "relatorios" => UserPermission {
+      (_, "relatorios") => UserPermission {
         module: module.to_string(),
         can_view: true,
         can_create: false,
         can_edit: false,
         can_delete: false,
       },
-      "clientes" => UserPermission {
+      (_, "clientes") => UserPermission {
         module: module.to_string(),
         can_view: true,
         can_create: true,
@@ -362,9 +428,16 @@ async fn upsert_permissions_for_user(pool: &MySqlPool, user_id: i64, permissions
 fn product_from_row(row: &sqlx::mysql::MySqlRow) -> Product {
   Product {
     id: row.get("id"),
+    code: row.get("code"),
     name: row.get("name"),
     manufacturer: row.get("manufacturer"),
     brand: row.get("brand"),
+    supplier: row.get("supplier"),
+    status: row.get("status"),
+    street: row.get("street"),
+    position: row.get("position"),
+    level: row.get("level"),
+    apartment: row.get("apartment"),
     quantity: row.get("quantity"),
   }
 }
@@ -381,23 +454,32 @@ fn sale_from_row(row: &sqlx::mysql::MySqlRow) -> Sale {
   }
 }
 
-fn validate_product_fields(name: &str, manufacturer: &str, brand: &str, quantity: i64) -> Result<(), String> {
-  if name.trim().is_empty() || manufacturer.trim().is_empty() || brand.trim().is_empty() {
-    return Err("Preencha nome, fabricante e marca para salvar o produto.".to_string());
+fn validate_product_fields(payload: &ProductPayload) -> Result<(), String> {
+  if payload.code.trim().is_empty() || payload.name.trim().is_empty() || payload.supplier.trim().is_empty() {
+    return Err("Preencha código, nome e fornecedor para salvar o produto.".to_string());
   }
-  if quantity < 0 {
+  if payload.quantity < 0 || [payload.street, payload.position, payload.level, payload.apartment].iter().any(|value| *value < 0 || *value > 99) {
     return Err("A quantidade não pode ser negativa.".to_string());
+  }
+  if payload.status != "ativo" && payload.status != "inativo" {
+    return Err("Status de produto inválido.".to_string());
   }
   Ok(())
 }
 
+fn product_select() -> &'static str {
+  "SELECT id, code, name, manufacturer, brand, supplier, status, street, position, level, apartment, quantity FROM products"
+}
+
 #[tauri::command]
-async fn list_products(session_token: String) -> Result<Vec<Product>, String> {
+async fn list_products(session_token: String, search: Option<String>, status: Option<String>) -> Result<Vec<Product>, String> {
   let pool = get_pool().await?;
   require_permission(&pool, &session_token, "estoque", "view").await?;
-  let rows = sqlx::query(
-    "SELECT id, name, manufacturer, brand, quantity FROM products ORDER BY name ASC, id ASC",
-  )
+  let query = format!("{} WHERE (? IS NULL OR code LIKE CONCAT('%', ?, '%') OR name LIKE CONCAT('%', ?, '%') OR supplier LIKE CONCAT('%', ?, '%')) AND (? IS NULL OR status = ?) ORDER BY name ASC, id ASC", product_select());
+  let term = search.as_deref();
+  let rows = sqlx::query(&query)
+    .bind(term).bind(term).bind(term).bind(term)
+    .bind(status.as_deref()).bind(status.as_deref())
   .fetch_all(&pool)
   .await
   .map_err(|error| format!("Falha ao listar produtos: {error}"))?;
@@ -407,23 +489,27 @@ async fn list_products(session_token: String) -> Result<Vec<Product>, String> {
 
 #[tauri::command]
 async fn create_product(payload: ProductPayload) -> Result<Product, String> {
-  validate_product_fields(&payload.name, &payload.manufacturer, &payload.brand, payload.quantity)?;
+  validate_product_fields(&payload)?;
   let pool = get_pool().await?;
   require_permission(&pool, &payload.session_token, "estoque", "create").await?;
 
   let result = sqlx::query(
-    "INSERT INTO products (name, manufacturer, brand, quantity) VALUES (?, ?, ?, ?)",
+    "INSERT INTO products (code, name, manufacturer, brand, supplier, status, street, position, level, apartment, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
+  .bind(payload.code.trim())
   .bind(payload.name.trim())
   .bind(payload.manufacturer.trim())
   .bind(payload.brand.trim())
+  .bind(payload.supplier.trim())
+  .bind(&payload.status)
+  .bind(payload.street).bind(payload.position).bind(payload.level).bind(payload.apartment)
   .bind(payload.quantity)
   .execute(&pool)
   .await
   .map_err(|error| format!("Falha ao cadastrar produto: {error}"))?;
 
   let row = sqlx::query(
-    "SELECT id, name, manufacturer, brand, quantity FROM products WHERE id = ?",
+    &format!("{} WHERE id = ?", product_select()),
   )
   .bind(result.last_insert_id())
   .fetch_one(&pool)
@@ -435,16 +521,21 @@ async fn create_product(payload: ProductPayload) -> Result<Product, String> {
 
 #[tauri::command]
 async fn update_product(payload: UpdateProductPayload) -> Result<Product, String> {
-  validate_product_fields(&payload.name, &payload.manufacturer, &payload.brand, payload.quantity)?;
+  let create_payload = ProductPayload { code: payload.code.clone(), name: payload.name.clone(), manufacturer: payload.manufacturer.clone(), brand: payload.brand.clone(), supplier: payload.supplier.clone(), status: payload.status.clone(), street: payload.street, position: payload.position, level: payload.level, apartment: payload.apartment, quantity: payload.quantity, session_token: payload.session_token.clone() };
+  validate_product_fields(&create_payload)?;
   let pool = get_pool().await?;
   require_permission(&pool, &payload.session_token, "estoque", "edit").await?;
 
   let result = sqlx::query(
-    "UPDATE products SET name = ?, manufacturer = ?, brand = ?, quantity = ? WHERE id = ?",
+    "UPDATE products SET code = ?, name = ?, manufacturer = ?, brand = ?, supplier = ?, status = ?, street = ?, position = ?, level = ?, apartment = ?, quantity = ? WHERE id = ?",
   )
+  .bind(payload.code.trim())
   .bind(payload.name.trim())
   .bind(payload.manufacturer.trim())
   .bind(payload.brand.trim())
+  .bind(payload.supplier.trim())
+  .bind(&payload.status)
+  .bind(payload.street).bind(payload.position).bind(payload.level).bind(payload.apartment)
   .bind(payload.quantity)
   .bind(payload.id)
   .execute(&pool)
@@ -456,7 +547,7 @@ async fn update_product(payload: UpdateProductPayload) -> Result<Product, String
   }
 
   let row = sqlx::query(
-    "SELECT id, name, manufacturer, brand, quantity FROM products WHERE id = ?",
+    &format!("{} WHERE id = ?", product_select()),
   )
   .bind(payload.id)
   .fetch_one(&pool)
@@ -481,7 +572,10 @@ async fn delete_product(payload: DeleteProductPayload) -> Result<(), String> {
 #[tauri::command]
 async fn list_sales(session_token: String) -> Result<Vec<Sale>, String> {
   let pool = get_pool().await?;
-  require_permission(&pool, &session_token, "relatorios", "view").await?;
+  let user = require_permission(&pool, &session_token, "relatorios", "view").await?;
+  if user.role != "admin" && user.role != "pce" {
+    return Err("Acesso restrito ao PCE ou administrador.".to_string());
+  }
   let rows = sqlx::query(
     "SELECT id, product_id, product_name, client_name, customer_type, quantity, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS date FROM sales ORDER BY created_at DESC, id DESC LIMIT 100",
   )
@@ -513,7 +607,7 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
     .map_err(|error| format!("Falha ao iniciar transação da venda: {error}"))?;
 
   let product_row = sqlx::query(
-    "SELECT id, name, quantity FROM products WHERE id = ? FOR UPDATE",
+    "SELECT id, code, name, quantity, street, position, level, apartment FROM products WHERE id = ? FOR UPDATE",
   )
   .bind(payload.product_id)
   .fetch_optional(&mut *transaction)
@@ -528,6 +622,7 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
     return Err("Estoque insuficiente para esta venda.".to_string());
   }
   let product_name: String = product_row.get("name");
+  let product_code: String = product_row.get("code");
 
   sqlx::query("UPDATE products SET quantity = quantity - ? WHERE id = ?")
     .bind(payload.quantity)
@@ -548,6 +643,26 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
   .await
   .map_err(|error| format!("Falha ao registrar venda: {error}"))?;
 
+  let demand = sqlx::query("INSERT INTO picking_demands (sale_id) VALUES (?)")
+    .bind(result.last_insert_id())
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| format!("Falha ao criar demanda de separação: {error}"))?;
+
+  sqlx::query("INSERT INTO picking_demand_items (demand_id, product_id, product_code, product_name, street, position, level, apartment, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(demand.last_insert_id())
+    .bind(payload.product_id)
+    .bind(product_code)
+    .bind(&product_name)
+    .bind(product_row.get::<i64, _>("street"))
+    .bind(product_row.get::<i64, _>("position"))
+    .bind(product_row.get::<i64, _>("level"))
+    .bind(product_row.get::<i64, _>("apartment"))
+    .bind(payload.quantity)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| format!("Falha ao adicionar item à demanda: {error}"))?;
+
   transaction
     .commit()
     .await
@@ -562,6 +677,35 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
   .map_err(|error| format!("Falha ao consultar venda registrada: {error}"))?;
 
   Ok(sale_from_row(&row))
+}
+
+#[tauri::command]
+async fn list_demands(session_token: String, status: Option<String>) -> Result<Vec<PickingDemand>, String> {
+  let pool = get_pool().await?;
+  require_permission(&pool, &session_token, "demandas", "view").await?;
+  let rows = sqlx::query("SELECT d.id, d.sale_id, d.status, DATE_FORMAT(d.created_at, '%d/%m/%Y %H:%i') AS created_at, s.client_name FROM picking_demands d INNER JOIN sales s ON s.id = d.sale_id WHERE (? IS NULL OR d.status = ?) ORDER BY d.created_at DESC, d.id DESC")
+    .bind(status.as_deref()).bind(status.as_deref()).fetch_all(&pool).await
+    .map_err(|error| format!("Falha ao listar demandas: {error}"))?;
+  let mut demands = Vec::new();
+  for row in rows {
+    let demand_id: i64 = row.get("id");
+    let items = sqlx::query("SELECT product_code, product_name, quantity, CONCAT(LPAD(street, 2, '0'), '-', LPAD(position, 2, '0'), '-', LPAD(level, 2, '0'), '-', LPAD(apartment, 2, '0')) AS location FROM picking_demand_items WHERE demand_id = ?")
+      .bind(demand_id).fetch_all(&pool).await
+      .map_err(|error| format!("Falha ao listar itens da demanda: {error}"))?
+      .iter().map(|item| PickingDemandItem { code: item.get("product_code"), name: item.get("product_name"), quantity: item.get("quantity"), position: item.get("location") }).collect();
+    demands.push(PickingDemand { id: demand_id, sale_id: row.get("sale_id"), status: row.get("status"), created_at: row.get("created_at"), client_name: row.get("client_name"), items });
+  }
+  Ok(demands)
+}
+
+#[tauri::command]
+async fn complete_demand(payload: DemandStatusPayload) -> Result<(), String> {
+  let pool = get_pool().await?;
+  require_permission(&pool, &payload.session_token, "demandas", "edit").await?;
+  sqlx::query("UPDATE picking_demands SET status = 'concluida', completed_at = NOW() WHERE id = ?")
+    .bind(payload.demand_id).execute(&pool).await
+    .map_err(|error| format!("Falha ao concluir demanda: {error}"))?;
+  Ok(())
 }
 
 #[tauri::command]
@@ -727,8 +871,8 @@ async fn create_user(payload: CreateUserPayload) -> Result<UserSummary, String> 
   require_admin_session(&pool, &payload.session_token).await?;
 
   let role = match payload.role.as_str() {
-    "admin" | "vendedor" => payload.role,
-    _ => "vendedor".to_string(),
+    "admin" | "vendedor" | "estoquista" | "pce" => payload.role,
+    _ => return Err("Perfil de usuário inválido.".to_string()),
   };
 
   let existing: Option<i64> = sqlx::query_scalar("SELECT id FROM users WHERE email = ? LIMIT 1")
@@ -821,7 +965,9 @@ pub fn run() {
       update_product,
       delete_product,
       list_sales,
-      create_sale
+      create_sale,
+      list_demands,
+      complete_demand
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

@@ -4,11 +4,12 @@ import { useAuth } from './useAuth'
 
 const products = ref([])
 const sales = ref([])
-const productForm = ref({ name: '', manufacturer: '', brand: '', quantity: 1 })
+const productForm = ref({ code: '', name: '', manufacturer: '', brand: '', supplier: '', status: 'ativo', street: 0, position: 0, level: 0, apartment: 0, quantity: 1 })
 const saleForm = ref({ productId: '', clientName: '', customerType: 'Pessoa física', quantity: 1 })
 const editingProductId = ref(null)
 const feedback = ref({ type: '', message: '' })
 const loading = ref(false)
+const demands = ref([])
 
 const { session, hasPermission } = useAuth()
 
@@ -24,7 +25,7 @@ function sessionToken() {
 }
 
 function resetProductForm() {
-  productForm.value = { name: '', manufacturer: '', brand: '', quantity: 1 }
+  productForm.value = { code: '', name: '', manufacturer: '', brand: '', supplier: '', status: 'ativo', street: 0, position: 0, level: 0, apartment: 0, quantity: 1 }
   editingProductId.value = null
 }
 
@@ -41,9 +42,9 @@ async function loadData() {
   if (!session.value?.token) return
   loading.value = true
   try {
-    const loadedProducts = await invoke('list_products', { session_token: sessionToken() })
+    const loadedProducts = await invoke('list_products', { sessionToken: sessionToken(), search: null, status: null })
     const loadedSales = hasPermission('relatorios', 'can_view')
-      ? await invoke('list_sales', { session_token: sessionToken() })
+      ? await invoke('list_sales', { sessionToken: sessionToken() })
       : []
     products.value = loadedProducts
     sales.value = loadedSales
@@ -55,14 +56,44 @@ async function loadData() {
   }
 }
 
+async function searchProducts(search = '', status = null) {
+  if (!session.value?.token) return []
+  try {
+    const result = await invoke('list_products', { sessionToken: sessionToken(), search: search.trim() || null, status })
+    products.value = result
+    return result
+  } catch (error) {
+    setFeedback('error', error?.toString() ?? 'Não foi possível pesquisar produtos.')
+    return []
+  }
+}
+
+async function loadDemands(status = null) {
+  if (!session.value?.token) return []
+  try {
+    demands.value = await invoke('list_demands', { sessionToken: sessionToken(), status })
+    return demands.value
+  } catch (error) {
+    setFeedback('error', error?.toString() ?? 'Não foi possível carregar as demandas.')
+    return []
+  }
+}
+
+async function completeDemand(demandId) {
+  await invoke('complete_demand', { payload: { demand_id: demandId, session_token: sessionToken() } })
+  await loadDemands()
+}
+
 async function handleProductSubmit() {
+  const code = productForm.value.code.trim()
   const name = productForm.value.name.trim()
   const manufacturer = productForm.value.manufacturer.trim()
   const brand = productForm.value.brand.trim()
+  const supplier = productForm.value.supplier.trim()
   const quantity = Number(productForm.value.quantity)
 
-  if (!name || !manufacturer || !brand) {
-    setFeedback('error', 'Preencha nome, fabricante e marca para salvar o produto.')
+  if (!code || !name || !supplier) {
+    setFeedback('error', 'Preencha código, nome e fornecedor para salvar o produto.')
     return
   }
   if (!Number.isInteger(quantity) || quantity < 0) {
@@ -72,7 +103,7 @@ async function handleProductSubmit() {
 
   loading.value = true
   try {
-    const payload = { name, manufacturer, brand, quantity, session_token: sessionToken() }
+    const payload = { code, name, manufacturer, brand, supplier, status: productForm.value.status, street: Number(productForm.value.street), position: Number(productForm.value.position), level: Number(productForm.value.level), apartment: Number(productForm.value.apartment), quantity, session_token: sessionToken() }
     const savedProduct = editingProductId.value
       ? await invoke('update_product', { payload: { ...payload, id: editingProductId.value } })
       : await invoke('create_product', { payload })
@@ -95,9 +126,16 @@ async function handleProductSubmit() {
 
 function editProduct(product) {
   productForm.value = {
+    code: product.code,
     name: product.name,
     manufacturer: product.manufacturer,
     brand: product.brand,
+    supplier: product.supplier,
+    status: product.status,
+    street: product.street,
+    position: product.position,
+    level: product.level,
+    apartment: product.apartment,
     quantity: product.quantity,
   }
   editingProductId.value = product.id
@@ -170,8 +208,12 @@ export function useInventory() {
     editingProductId,
     feedback,
     loading,
+    demands,
     setFeedback,
     loadData,
+    searchProducts,
+    loadDemands,
+    completeDemand,
     resetProductForm,
     resetSaleForm,
     handleProductSubmit,

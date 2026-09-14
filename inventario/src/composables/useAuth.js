@@ -13,6 +13,8 @@ function hasPermission(moduleName, action = 'can_view') {
   const currentUser = user.value
   if (!currentUser) return false
   if (currentUser.role === 'admin') return true
+  if (moduleName === 'relatorios' && currentUser.role !== 'pce') return false
+  if (moduleName === 'demandas' && currentUser.role !== 'estoquista') return false
 
   const modulePermission = permissions.value.find((item) => item.module === moduleName)
   return Boolean(modulePermission?.[action])
@@ -68,7 +70,7 @@ async function listUsers() {
   if (!session.value?.token) return []
 
   try {
-    return await invoke('list_users', { session_token: session.value.token })
+    return await invoke('list_users', { sessionToken: session.value.token })
   } catch (err) {
     error.value = err?.toString() ?? 'Não foi possível listar usuários.'
     return []
@@ -107,8 +109,8 @@ async function listPermissions(userId = null) {
 
   try {
     return await invoke('list_user_permissions', {
-      session_token: session.value.token,
-      user_id: userId,
+      sessionToken: session.value.token,
+      userId,
     })
   } catch (err) {
     error.value = err?.toString() ?? 'Não foi possível carregar permissões.'
@@ -137,7 +139,7 @@ async function logout() {
   }
 
   try {
-    await invoke('logout', { session_token: session.value.token })
+    await invoke('logout', { sessionToken: session.value.token })
   } catch {
     // Ignora falhas na sessão e limpa localmente
   } finally {

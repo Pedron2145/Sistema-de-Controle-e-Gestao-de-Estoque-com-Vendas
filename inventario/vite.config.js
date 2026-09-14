@@ -8,7 +8,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 // https://vite.dev/config/
 // inventario/vite.config.js
 export default defineConfig({
-  base: '/',
+  base: './',
   plugins: [vue(), vueJsx(), vueDevTools()],
   resolve: {
     alias: {

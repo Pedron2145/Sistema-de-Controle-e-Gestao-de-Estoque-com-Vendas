@@ -19,6 +19,7 @@ const form = ref({
 const permissionCatalog = [
   { module: 'vendas', label: 'Vendas' },
   { module: 'estoque', label: 'Estoque' },
+  { module: 'demandas', label: 'Demandas' },
   { module: 'relatorios', label: 'Relatórios' },
   { module: 'clientes', label: 'Clientes' },
 ]
@@ -34,12 +35,28 @@ function applyPermissionDefaults(role) {
       { module: 'estoque', can_view: true, can_create: true, can_edit: true, can_delete: true },
       { module: 'relatorios', can_view: true, can_create: true, can_edit: true, can_delete: true },
       { module: 'clientes', can_view: true, can_create: true, can_edit: true, can_delete: true },
+      { module: 'demandas', can_view: true, can_create: true, can_edit: true, can_delete: true },
     ],
     vendedor: [
       { module: 'vendas', can_view: true, can_create: true, can_edit: false, can_delete: false },
       { module: 'estoque', can_view: true, can_create: false, can_edit: false, can_delete: false },
       { module: 'relatorios', can_view: true, can_create: false, can_edit: false, can_delete: false },
       { module: 'clientes', can_view: true, can_create: true, can_edit: false, can_delete: false },
+      { module: 'demandas', can_view: false, can_create: false, can_edit: false, can_delete: false },
+    ],
+    estoquista: [
+      { module: 'vendas', can_view: false, can_create: false, can_edit: false, can_delete: false },
+      { module: 'estoque', can_view: true, can_create: false, can_edit: false, can_delete: false },
+      { module: 'demandas', can_view: true, can_create: false, can_edit: true, can_delete: false },
+      { module: 'relatorios', can_view: false, can_create: false, can_edit: false, can_delete: false },
+      { module: 'clientes', can_view: false, can_create: false, can_edit: false, can_delete: false },
+    ],
+    pce: [
+      { module: 'vendas', can_view: false, can_create: false, can_edit: false, can_delete: false },
+      { module: 'estoque', can_view: true, can_create: true, can_edit: true, can_delete: false },
+      { module: 'demandas', can_view: false, can_create: false, can_edit: false, can_delete: false },
+      { module: 'relatorios', can_view: true, can_create: true, can_edit: false, can_delete: false },
+      { module: 'clientes', can_view: false, can_create: false, can_edit: false, can_delete: false },
     ],
   }
 
@@ -64,6 +81,16 @@ async function selectUser(userId) {
   const grouped = {}
   for (const permission of permissions) {
     grouped[permission.module] = { ...permission }
+  }
+
+  for (const module of permissionCatalog) {
+    grouped[module.module] ??= {
+      module: module.module,
+      can_view: false,
+      can_create: false,
+      can_edit: false,
+      can_delete: false,
+    }
   }
 
   selectedPermissions.value = grouped
@@ -134,6 +161,8 @@ onMounted(async () => {
             <select v-model="form.role">
               <option value="vendedor">Vendedor</option>
               <option value="admin">Administrador</option>
+              <option value="estoquista">Estoquista</option>
+              <option value="pce">PCE</option>
             </select>
           </label>
 

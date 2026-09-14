@@ -5,12 +5,15 @@ import ReportsPage from '../pages/ReportsPage.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import FirstAccessPage from '../pages/FirstAccessPage.vue'
 import AdminUsersPage from '../pages/AdminUsersPage.vue'
+import DemandsPage from '../pages/DemandsPage.vue'
 import { useAuth } from '../composables/useAuth'
 
 function hasPermission(moduleName, action = 'can_view') {
   const { user, permissions } = useAuth()
   if (!user.value) return false
   if (user.value.role === 'admin') return true
+  if (moduleName === 'relatorios' && user.value.role !== 'pce') return false
+  if (moduleName === 'demandas' && user.value.role !== 'estoquista') return false
 
   const modulePermission = permissions.value.find((item) => item.module === moduleName)
   return Boolean(modulePermission?.[action])
@@ -44,6 +47,12 @@ const router = createRouter({
       name: 'vendas',
       component: SalesPage,
       meta: { requiresAuth: true, module: 'vendas', action: 'can_view' },
+    },
+    {
+      path: '/demandas',
+      name: 'demandas',
+      component: DemandsPage,
+      meta: { requiresAuth: true, module: 'demandas', action: 'can_view' },
     },
     {
       path: '/relatorios',

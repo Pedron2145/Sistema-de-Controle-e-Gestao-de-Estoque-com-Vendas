@@ -1,6 +1,6 @@
 <script setup>
 import { useInventory } from '../composables/useInventory'
-const { lowStockProducts, sales } = useInventory()
+const { lowStockProducts } = useInventory()
 </script>
 
 <template>
@@ -15,17 +15,6 @@ const { lowStockProducts, sales } = useInventory()
     </div>
     <p v-else class="empty-state">Estoque saudável para todos os produtos.</p>
 
-    <div class="sales-list">
-      <h3>Últimas vendas</h3>
-      <div v-if="sales.length" class="sale-card-list">
-        <article v-for="sale in sales.slice(0, 5)" :key="sale.id" class="sale-card">
-          <strong>{{ sale.productName }}</strong>
-          <p>{{ sale.clientName }} · {{ sale.customerType }}</p>
-          <p>{{ sale.quantity }} unidade(s) · {{ sale.date }}</p>
-        </article>
-      </div>
-      <p v-else class="empty-state">Nenhuma venda registrada até o momento.</p>
-    </div>
   </div>
 </template>
 

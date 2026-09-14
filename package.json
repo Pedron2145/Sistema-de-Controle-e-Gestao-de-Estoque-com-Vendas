@@ -1,8 +1,7 @@
-
-
 {
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.4"
+    "@tauri-apps/cli": "^2.11.4",
+    "vite": "^8.3.0"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1"
@@ -12,6 +11,3 @@
     "build": "npm --prefix ./inventario run build"
   }
 }
-
-
-

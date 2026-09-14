@@ -19,6 +19,10 @@ const navItems = computed(() => {
     items.push({ label: 'Vendas', path: '/vendas', icon: '🛒' })
   }
 
+  if (hasPermission('demandas', 'can_view')) {
+    items.push({ label: 'Demandas', path: '/demandas', icon: '📋' })
+  }
+
   if (hasPermission('relatorios', 'can_view')) {
     items.push({ label: 'Relatórios', path: '/relatorios', icon: '📊' })
   }
@@ -81,7 +85,7 @@ async function handleLogout() {
           <div class="brand-mark">ERP</div>
           <div>
             <strong>ERP Basic</strong>
-            <small>{{ user?.role === 'admin' ? 'Administrador' : 'Usuário' }}</small>
+            <small>{{ user?.role === 'admin' ? 'Administrador' : user?.role === 'pce' ? 'PCE' : user?.role === 'estoquista' ? 'Estoquista' : 'Vendedor' }}</small>
           </div>
         </div>
 
@@ -109,7 +113,7 @@ async function handleLogout() {
 </template>
 
 <style>
-:global(body) {
+body {
   margin: 0;
   font-family: Inter, 'Segoe UI', sans-serif;
   background: linear-gradient(135deg, #f3f6ff 0%, #eef4ff 100%);

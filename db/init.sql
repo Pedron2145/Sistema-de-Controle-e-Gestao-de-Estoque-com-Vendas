@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(120) NOT NULL,
   email VARCHAR(160) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'vendedor') NOT NULL DEFAULT 'vendedor',
+  role ENUM('admin', 'vendedor', 'estoquista', 'pce') NOT NULL DEFAULT 'vendedor',
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -35,12 +35,21 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE TABLE IF NOT EXISTS products (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(40) NOT NULL,
   name VARCHAR(160) NOT NULL,
   manufacturer VARCHAR(160) NOT NULL,
   brand VARCHAR(160) NOT NULL,
+  supplier VARCHAR(160) NOT NULL,
+  status ENUM('ativo', 'inativo') NOT NULL DEFAULT 'ativo',
+  street SMALLINT NOT NULL DEFAULT 0,
+  position SMALLINT NOT NULL DEFAULT 0,
+  level SMALLINT NOT NULL DEFAULT 0,
+  apartment SMALLINT NOT NULL DEFAULT 0,
   quantity INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_products_search (code, status, supplier),
+  INDEX idx_products_location (street, position, level, apartment)
 );
 
 CREATE TABLE IF NOT EXISTS sales (
@@ -53,3 +62,32 @@ CREATE TABLE IF NOT EXISTS sales (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_sales_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
 );
+
+CREATE TABLE IF NOT EXISTS picking_demands (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sale_id INT NOT NULL UNIQUE,
+  status ENUM('aberta', 'concluida') NOT NULL DEFAULT 'aberta',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP NULL,
+  CONSTRAINT fk_demands_sale FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS picking_demand_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  demand_id INT NOT NULL,
+  product_id INT NOT NULL,
+  product_code VARCHAR(40) NOT NULL,
+  product_name VARCHAR(160) NOT NULL,
+  street SMALLINT NOT NULL,
+  position SMALLINT NOT NULL,
+  level SMALLINT NOT NULL,
+  apartment SMALLINT NOT NULL,
+  quantity INT NOT NULL,
+  CONSTRAINT fk_demand_items_demand FOREIGN KEY (demand_id) REFERENCES picking_demands(id) ON DELETE CASCADE,
+  CONSTRAINT fk_demand_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+);
+
+ALTER TABLE users MODIFY role ENUM('admin', 'vendedor', 'estoquista', 'pce') NOT NULL DEFAULT 'vendedor';
+
+UPDATE products SET code = CONCAT('LEGACY-', id) WHERE code = '';
+UPDATE products SET supplier = manufacturer WHERE supplier = '';

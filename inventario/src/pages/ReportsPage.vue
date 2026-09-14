@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import * as XLSX from 'xlsx'
 import { useInventory } from '../composables/useInventory'
 import { useAuth } from '../composables/useAuth'
 
@@ -10,6 +11,32 @@ const { hasPermission } = useAuth()
 const recentSales = computed(() => sales.value.slice(0, 5))
 const lowStockProducts = computed(() => products.value.filter((product) => product.quantity <= 5))
 const canViewReports = hasPermission('relatorios', 'can_view')
+const dateFilter = ref('')
+const productCodeFilter = ref('')
+const statusFilter = ref('')
+
+const filteredSales = computed(() => sales.value.filter((sale) => {
+  const product = products.value.find((item) => item.id === sale.product_id)
+  const matchesCode = !productCodeFilter.value || product?.code?.toLowerCase().includes(productCodeFilter.value.toLowerCase())
+  const matchesStatus = !statusFilter.value || product?.status === statusFilter.value
+  const matchesDate = !dateFilter.value || sale.date?.includes(dateFilter.value.split('-').reverse().join('/'))
+  return matchesCode && matchesStatus && matchesDate
+}))
+
+function printReport() {
+  window.print()
+}
+
+function exportReport() {
+  const rows = filteredSales.value.map((sale) => {
+    const product = products.value.find((item) => item.id === sale.product_id)
+    return [sale.id, sale.date, product?.code ?? '', sale.product_name, product?.status ?? '', sale.client_name, sale.quantity]
+  })
+  const worksheet = XLSX.utils.aoa_to_sheet([['Venda', 'Data', 'Código', 'Produto', 'Status', 'Cliente', 'Quantidade'], ...rows])
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Movimentações')
+  XLSX.writeFile(workbook, 'relatorio-estoque.xlsx')
+}
 
 onMounted(() => {
   loadData()
@@ -44,6 +71,18 @@ onMounted(() => {
         </div>
       </header>
 
+      <section class="panel report-filters no-print">
+        <div class="panel-header">
+          <div><h2>Gerar relatório</h2><p class="panel-hint">Filtre movimentações por data, código do produto e status.</p></div>
+          <div class="card-actions"><button class="ghost-btn" type="button" @click="printReport">Imprimir</button><button class="primary-btn" type="button" @click="exportReport">Exportar para Excel</button></div>
+        </div>
+        <div class="report-filter-grid">
+          <label>Data<input v-model="dateFilter" type="date" /></label>
+          <label>Código do produto<input v-model="productCodeFilter" placeholder="Ex.: TEC-001" /></label>
+          <label>Status<select v-model="statusFilter"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>
+        </div>
+      </section>
+
       <section class="panel-grid">
         <div class="panel">
           <div class="panel-header">
@@ -51,7 +90,7 @@ onMounted(() => {
             <span class="badge">Resumo</span>
           </div>
 
-          <div v-if="recentSales.length" class="table-wrap">
+          <div v-if="filteredSales.length" class="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -62,16 +101,16 @@ onMounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="sale in recentSales" :key="sale.id">
-                  <td>{{ sale.clientName }}</td>
-                  <td>{{ sale.productName }}</td>
+                <tr v-for="sale in filteredSales" :key="sale.id">
+                  <td>{{ sale.client_name }}</td>
+                  <td>{{ sale.product_name }}</td>
                   <td>{{ sale.quantity }}</td>
                   <td>{{ sale.date }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p v-else class="empty-state">Ainda não há vendas registradas.</p>
+          <p v-else class="empty-state">Nenhuma movimentação corresponde aos filtros.</p>
         </div>
 
         <div class="panel">
@@ -99,6 +138,13 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.report-filters { display: flex; flex-direction: column; gap: 14px; }
+.report-filter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.report-filter-grid label { display: flex; flex-direction: column; gap: 7px; font-weight: 700; }
+.report-filter-grid input, .report-filter-grid select { border: 1px solid #dbe3f0; border-radius: 11px; padding: 10px 12px; background: #f8fafc; }
+.panel-hint { margin: 6px 0 0; color: #64748b; font-size: .9rem; }
+.no-print { }
+@media print { .sidebar, .no-print { display: none !important; } .content-area { padding: 0; } }
 .page-shell {
   display: flex;
   flex-direction: column;
