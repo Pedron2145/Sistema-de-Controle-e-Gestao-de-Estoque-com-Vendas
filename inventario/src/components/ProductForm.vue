@@ -31,10 +31,7 @@ const canEdit = hasPermission('estoque', 'can_edit')
         Fornecedor
         <input v-model="productForm.supplier" placeholder="Ex.: Distribuidora Tech" required />
       </label>
-      <label>
-        Fabricante
-        <input v-model="productForm.manufacturer" placeholder="Ex.: TechLabs" />
-      </label>
+      
       <label>
         Marca
         <input v-model="productForm.brand" placeholder="Ex.: HyperKey" />
