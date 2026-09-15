@@ -85,11 +85,9 @@ pub struct Product {
 #[derive(Debug, Clone, Serialize)]
 pub struct Sale {
   id: i64,
-  product_id: i64,
-  product_name: String,
   client_name: String,
   customer_type: String,
-  quantity: i64,
+  item_count: i64,
   date: String,
 }
 
@@ -134,11 +132,16 @@ pub struct DeleteProductPayload {
 
 #[derive(Debug, Deserialize)]
 pub struct SalePayload {
-  product_id: i64,
+  items: Vec<SaleItemPayload>,
   client_name: String,
   customer_type: String,
-  quantity: i64,
   session_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SaleItemPayload {
+  product_id: i64,
+  quantity: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -445,11 +448,9 @@ fn product_from_row(row: &sqlx::mysql::MySqlRow) -> Product {
 fn sale_from_row(row: &sqlx::mysql::MySqlRow) -> Sale {
   Sale {
     id: row.get("id"),
-    product_id: row.get("product_id"),
-    product_name: row.get("product_name"),
     client_name: row.get("client_name"),
     customer_type: row.get("customer_type"),
-    quantity: row.get("quantity"),
+    item_count: row.get("item_count"),
     date: row.get("date"),
   }
 }
@@ -577,7 +578,7 @@ async fn list_sales(session_token: String) -> Result<Vec<Sale>, String> {
     return Err("Acesso restrito ao PCE ou administrador.".to_string());
   }
   let rows = sqlx::query(
-    "SELECT id, product_id, product_name, client_name, customer_type, quantity, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS date FROM sales ORDER BY created_at DESC, id DESC LIMIT 100",
+    "SELECT s.id, s.client_name, s.customer_type, COUNT(si.id) AS item_count, DATE_FORMAT(s.created_at, '%d/%m/%Y %H:%i') AS date FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id GROUP BY s.id, s.client_name, s.customer_type, s.created_at ORDER BY s.created_at DESC, s.id DESC LIMIT 100",
   )
   .fetch_all(&pool)
   .await
@@ -592,8 +593,8 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
   if client_name.is_empty() {
     return Err("Informe o nome do cliente ou empresa.".to_string());
   }
-  if payload.quantity < 1 {
-    return Err("A quantidade da venda deve ser maior que zero.".to_string());
+  if payload.items.is_empty() || payload.items.iter().any(|item| item.quantity < 1) {
+    return Err("Adicione pelo menos um produto com quantidade maior que zero.".to_string());
   }
   if payload.customer_type != "Pessoa física" && payload.customer_type != "Empresa" {
     return Err("Tipo de cliente inválido.".to_string());
@@ -606,39 +607,11 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
     .await
     .map_err(|error| format!("Falha ao iniciar transação da venda: {error}"))?;
 
-  let product_row = sqlx::query(
-    "SELECT id, code, name, quantity, street, position, level, apartment FROM products WHERE id = ? FOR UPDATE",
-  )
-  .bind(payload.product_id)
-  .fetch_optional(&mut *transaction)
-  .await
-  .map_err(|error| format!("Falha ao consultar estoque: {error}"))?;
-
-  let Some(product_row) = product_row else {
-    return Err("Selecione um produto válido para vender.".to_string());
-  };
-  let stock: i64 = product_row.get("quantity");
-  if payload.quantity > stock {
-    return Err("Estoque insuficiente para esta venda.".to_string());
-  }
-  let product_name: String = product_row.get("name");
-  let product_code: String = product_row.get("code");
-
-  sqlx::query("UPDATE products SET quantity = quantity - ? WHERE id = ?")
-    .bind(payload.quantity)
-    .bind(payload.product_id)
-    .execute(&mut *transaction)
-    .await
-    .map_err(|error| format!("Falha ao atualizar estoque: {error}"))?;
-
   let result = sqlx::query(
-    "INSERT INTO sales (product_id, product_name, client_name, customer_type, quantity) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO sales (client_name, customer_type) VALUES (?, ?)",
   )
-  .bind(payload.product_id)
-  .bind(&product_name)
   .bind(client_name)
   .bind(&payload.customer_type)
-  .bind(payload.quantity)
   .execute(&mut *transaction)
   .await
   .map_err(|error| format!("Falha ao registrar venda: {error}"))?;
@@ -649,19 +622,38 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
     .await
     .map_err(|error| format!("Falha ao criar demanda de separação: {error}"))?;
 
-  sqlx::query("INSERT INTO picking_demand_items (demand_id, product_id, product_code, product_name, street, position, level, apartment, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(demand.last_insert_id())
-    .bind(payload.product_id)
-    .bind(product_code)
-    .bind(&product_name)
-    .bind(product_row.get::<i64, _>("street"))
-    .bind(product_row.get::<i64, _>("position"))
-    .bind(product_row.get::<i64, _>("level"))
-    .bind(product_row.get::<i64, _>("apartment"))
-    .bind(payload.quantity)
-    .execute(&mut *transaction)
+  for item in &payload.items {
+    let product_row = sqlx::query(
+      "SELECT id, code, name, quantity, street, position, level, apartment FROM products WHERE id = ? FOR UPDATE",
+    )
+    .bind(item.product_id)
+    .fetch_optional(&mut *transaction)
     .await
-    .map_err(|error| format!("Falha ao adicionar item à demanda: {error}"))?;
+    .map_err(|error| format!("Falha ao consultar estoque: {error}"))?;
+    let Some(product_row) = product_row else {
+      return Err("Um dos produtos selecionados não é válido.".to_string());
+    };
+    let stock: i64 = product_row.get("quantity");
+    if item.quantity > stock {
+      return Err(format!("Estoque insuficiente para o produto {}.", product_row.get::<String, _>("name")));
+    }
+    let product_name: String = product_row.get("name");
+    let product_code: String = product_row.get("code");
+
+    sqlx::query("UPDATE products SET quantity = quantity - ? WHERE id = ?")
+      .bind(item.quantity).bind(item.product_id).execute(&mut *transaction).await
+      .map_err(|error| format!("Falha ao atualizar estoque: {error}"))?;
+    sqlx::query("INSERT INTO sale_items (sale_id, product_id, product_name, quantity) VALUES (?, ?, ?, ?)")
+      .bind(result.last_insert_id()).bind(item.product_id).bind(&product_name).bind(item.quantity)
+      .execute(&mut *transaction).await
+      .map_err(|error| format!("Falha ao registrar item da venda: {error}"))?;
+    sqlx::query("INSERT INTO picking_demand_items (demand_id, product_id, product_code, product_name, street, position, level, apartment, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(demand.last_insert_id()).bind(item.product_id).bind(product_code).bind(&product_name)
+      .bind(product_row.get::<i64, _>("street")).bind(product_row.get::<i64, _>("position"))
+      .bind(product_row.get::<i64, _>("level")).bind(product_row.get::<i64, _>("apartment"))
+      .bind(item.quantity).execute(&mut *transaction).await
+      .map_err(|error| format!("Falha ao adicionar item à demanda: {error}"))?;
+  }
 
   transaction
     .commit()
@@ -669,7 +661,7 @@ async fn create_sale(payload: SalePayload) -> Result<Sale, String> {
     .map_err(|error| format!("Falha ao confirmar venda: {error}"))?;
 
   let row = sqlx::query(
-    "SELECT id, product_id, product_name, client_name, customer_type, quantity, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS date FROM sales WHERE id = ?",
+    "SELECT s.id, s.client_name, s.customer_type, COUNT(si.id) AS item_count, DATE_FORMAT(s.created_at, '%d/%m/%Y %H:%i') AS date FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id WHERE s.id = ? GROUP BY s.id, s.client_name, s.customer_type, s.created_at",
   )
   .bind(result.last_insert_id())
   .fetch_one(&pool)

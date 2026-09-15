@@ -1,6 +1,6 @@
 <script setup>
 import { useInventory } from '../composables/useInventory'
-const { saleForm, products, handleSaleSubmit } = useInventory()
+const { saleForm, products, addSaleItem, removeSaleItem, handleSaleSubmit } = useInventory()
 </script>
 
 <template>
@@ -33,9 +33,24 @@ const { saleForm, products, handleSaleSubmit } = useInventory()
         Quantidade da venda
         <input v-model.number="saleForm.quantity" type="number" min="1" />
       </label>
+      <button type="button" class="secondary-btn" @click="addSaleItem">Adicionar produto</button>
+
+      <div class="sale-items">
+        <div v-for="item in saleForm.items" :key="item.product_id" class="sale-item">
+          <span>{{ item.product_name }} <small>{{ item.quantity }} unidade(s)</small></span>
+          <button type="button" class="danger-btn" @click="removeSaleItem(item.product_id)">Remover</button>
+        </div>
+        <p v-if="!saleForm.items.length" class="empty-state">Nenhum produto adicionado.</p>
+      </div>
       <button type="submit" class="primary-btn">Confirmar venda</button>
     </form>
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.sale-items { display: flex; flex-direction: column; gap: 8px; }
+.sale-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #dbe3f0; border-radius: 11px; background: #f8fafc; }
+.sale-item span { min-width: 0; overflow-wrap: anywhere; }
+.sale-item small { color: #64748b; }
+.sale-item .danger-btn { min-height: 34px; padding: 7px 10px; }
+</style>

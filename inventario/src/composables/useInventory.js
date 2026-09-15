@@ -5,7 +5,7 @@ import { useAuth } from './useAuth'
 const products = ref([])
 const sales = ref([])
 const productForm = ref({ code: '', name: '', manufacturer: '', brand: '', supplier: '', status: 'ativo', street: 0, position: 0, level: 0, apartment: 0, quantity: 1 })
-const saleForm = ref({ productId: '', clientName: '', customerType: 'Pessoa física', quantity: 1 })
+const saleForm = ref({ productId: '', clientName: '', customerType: 'Pessoa física', quantity: 1, items: [] })
 const editingProductId = ref(null)
 const feedback = ref({ type: '', message: '' })
 const loading = ref(false)
@@ -35,7 +35,38 @@ function resetSaleForm() {
     clientName: '',
     customerType: 'Pessoa física',
     quantity: 1,
+    items: [],
   }
+}
+
+function addSaleItem() {
+  const product = products.value.find((item) => item.id === saleForm.value.productId)
+  const quantity = Number(saleForm.value.quantity)
+  if (!product) {
+    setFeedback('error', 'Selecione um produto válido para adicionar.')
+    return
+  }
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    setFeedback('error', 'A quantidade da venda deve ser um número inteiro maior que zero.')
+    return
+  }
+
+  const existingItem = saleForm.value.items.find((item) => item.product_id === product.id)
+  const nextQuantity = (existingItem?.quantity || 0) + quantity
+  if (nextQuantity > product.quantity) {
+    setFeedback('error', `Estoque insuficiente para ${product.name}.`)
+    return
+  }
+
+  saleForm.value.items = existingItem
+    ? saleForm.value.items.map((item) => item.product_id === product.id ? { ...item, quantity: nextQuantity } : item)
+    : [...saleForm.value.items, { product_id: product.id, product_name: product.name, quantity }]
+  saleForm.value.quantity = 1
+  setFeedback('info', `${product.name} adicionado à venda.`)
+}
+
+function removeSaleItem(productId) {
+  saleForm.value.items = saleForm.value.items.filter((item) => item.product_id !== productId)
 }
 
 async function loadData() {
@@ -159,28 +190,21 @@ async function removeProduct(productId) {
 }
 
 async function handleSaleSubmit() {
-  const quantity = Number(saleForm.value.quantity)
-  if (!saleForm.value.productId) {
-    setFeedback('error', 'Selecione um produto válido para vender.')
+  if (!saleForm.value.items.length) {
+    setFeedback('error', 'Adicione pelo menos um produto à venda.')
     return
   }
   if (!saleForm.value.clientName.trim()) {
     setFeedback('error', 'Informe o nome do cliente ou empresa.')
     return
   }
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    setFeedback('error', 'A quantidade da venda deve ser um número inteiro maior que zero.')
-    return
-  }
-
   loading.value = true
   try {
     const sale = await invoke('create_sale', {
       payload: {
-        product_id: saleForm.value.productId,
+        items: saleForm.value.items.map(({ product_id, quantity }) => ({ product_id, quantity })),
         client_name: saleForm.value.clientName.trim(),
         customer_type: saleForm.value.customerType,
-        quantity,
         session_token: sessionToken(),
       },
     })
@@ -216,6 +240,8 @@ export function useInventory() {
     completeDemand,
     resetProductForm,
     resetSaleForm,
+    addSaleItem,
+    removeSaleItem,
     handleProductSubmit,
     editProduct,
     removeProduct,

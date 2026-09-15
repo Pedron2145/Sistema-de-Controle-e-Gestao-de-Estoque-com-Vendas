@@ -8,7 +8,7 @@ Este projeto foi criado com a finalidade de ser um aprendizado para o uso das IA
 
 - Cadastro de produtos com nome, fabricante, marca e quantidade
 - Edição e remoção de produtos
-- Registro de vendas com baixa automática no estoque
+- Registro de vendas com vários produtos, remoção de itens antes da confirmação e baixa automática no estoque
 - Validação de regras de negócio, como estoque insuficiente e campos obrigatórios
 - Persistência centralizada em MySQL executado com Docker
 - Sessões, usuários e permissões armazenados no MySQL
@@ -56,6 +56,10 @@ Para gerar a build de produção:
 ```bash
 npm run build
 ```
+
+### Migração de vendas existentes
+
+As vendas agora usam `sales` como cabeçalho e `sale_items` para os produtos. Para um banco já criado, execute `db/migrate_sales_items.sql` uma vez com o MySQL em execução. Bancos novos recebem o modelo automaticamente pelo Docker Compose.
 
 ## 🚀 Como rodar como desktop com Tauri
 

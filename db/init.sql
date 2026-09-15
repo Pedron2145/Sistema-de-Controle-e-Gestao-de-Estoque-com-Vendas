@@ -54,13 +54,20 @@ CREATE TABLE IF NOT EXISTS products (
 
 CREATE TABLE IF NOT EXISTS sales (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  product_id INT NOT NULL,
-  product_name VARCHAR(160) NOT NULL,
   client_name VARCHAR(160) NOT NULL,
   customer_type ENUM('Pessoa física', 'Empresa') NOT NULL DEFAULT 'Pessoa física',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sale_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sale_id INT NOT NULL,
+  product_id INT NOT NULL,
+  product_name VARCHAR(160) NOT NULL,
   quantity INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_sales_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
+  CONSTRAINT fk_sale_items_sale FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sale_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
+  UNIQUE KEY uq_sale_product (sale_id, product_id)
 );
 
 CREATE TABLE IF NOT EXISTS picking_demands (
