@@ -68,7 +68,7 @@ npm run tauri dev
 
 ## 📌 Objetivo do projeto
 
-Este projeto tem por finalidade o aprendizado sobre o desenvolvimento de soluções com o auxílio de IAs e testar novas tecnologias.
+Desenvolvido apenas por uma pessoa com o auxílio da IA gratuita Github Copilot, visando melhorar as própias capacitações para aplicar e entender regras ne negócios, se baseando em empresas que buscam uma aplicação leve e simples para lidar com seu estoque, com foco central na arquitetura de "Endereçamento de Estoque" e vendas sem um PDV.
 
 ## 🔮 Próximos passos
 
