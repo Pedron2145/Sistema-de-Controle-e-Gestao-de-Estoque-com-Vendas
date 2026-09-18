@@ -2,7 +2,6 @@
 
 Aplicação de controle de estoque e vendas desenvolvida com Vue 3, Vite e Tauri, com foco em simplicidade, usabilidade e persistência centralizada em MySQL.
 
-Este projeto foi criado com a finalidade de ser um aprendizado para o uso das IAs em projetos
 
 ## ✨ O que a aplicação faz
 
