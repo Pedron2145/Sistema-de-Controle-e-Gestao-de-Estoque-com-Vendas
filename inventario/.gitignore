@@ -40,3 +40,9 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 
+#Depedências
+node_modules/
+dist/
+target/
+.env
+

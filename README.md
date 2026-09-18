@@ -72,8 +72,10 @@ Desenvolvido apenas por uma pessoa com o auxílio da IA gratuita Github Copilot,
 
 ## 🔮 Próximos passos
 
-- Implementar autenticação de usuário
 - Adicionar relatórios e gráficos de vendas
 - Criar filtros e busca avançada por produtos
 - Melhorar a experiência mobile e desktop
+- Painel cadastro Cliente
+- Precificação
+- Histórico Avançado
 

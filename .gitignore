@@ -1,7 +1,9 @@
 # Dependências
 node_modules/
 **/node_modules/
-
+dist/
+target/
+.env
 # Builds e artefatos gerados
 dist/
 **/dist/
